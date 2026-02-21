@@ -4,6 +4,10 @@ import random
 import re
 
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROGRESS_DIR = os.path.join(PROJECT_ROOT, "data", "progress")
+
+
 def parse_vocab_line(line: str):
     line = line.strip()
     if not line:
@@ -40,7 +44,8 @@ def load_vocab(path: str):
 
 def progress_path_for(vocab_path: str) -> str:
     base = os.path.splitext(os.path.basename(vocab_path))[0]
-    return f"progress_{base}.json"
+    os.makedirs(PROGRESS_DIR, exist_ok=True)
+    return os.path.join(PROGRESS_DIR, f"progress_{base}.json")
 
 
 def load_progress(p_path: str, vocab):

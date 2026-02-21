@@ -14,6 +14,9 @@ from vocab_progress import (
     weighted_choice,
 )
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+VOCAB_DIR = os.path.join(PROJECT_ROOT, "data", "vocab")
+
 
 class TrainerHandlersMixin:
     file_label: Any
@@ -35,7 +38,7 @@ class TrainerHandlersMixin:
     ime_commit: Any
 
     def _load_on_start(self):
-        default = "syokyuu_hanguk.txt"
+        default = os.path.join(VOCAB_DIR, "syokyuu_hanguk.txt")
         if os.path.exists(default):
             self.load_file(default)
             self.next_item()
@@ -44,7 +47,9 @@ class TrainerHandlersMixin:
 
     def pick_file(self):
         path = filedialog.askopenfilename(
-            title="syokyuu_hanguk.txt を選択", filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+            title="syokyuu_hanguk.txt を選択",
+            initialdir=VOCAB_DIR,
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
         )
         if path:
             self.load_file(path)

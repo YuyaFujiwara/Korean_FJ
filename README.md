@@ -31,13 +31,16 @@ python Hanguk_word.py
 ## ファイル構成
 
 - `Hanguk_word.py`: エントリポイント
-- `trainer_app.py`: アプリ組み立て
-- `trainer_ui.py`: UI 構築
-- `trainer_handlers.py`: 出題・判定・進捗処理
-- `trainer_ime.py`: ハングル入力処理
-- `hangul_utils.py`: ハングル関連ユーティリティ
-- `vocab_progress.py`: 語彙読み込み・進捗保存
-- `tts_player.py`: 音声再生
+- `src/`: アプリ本体コード
+	- `trainer_app.py`: アプリ組み立て
+	- `trainer_ui.py`: UI 構築
+	- `trainer_handlers.py`: 出題・判定・進捗処理
+	- `trainer_ime.py`: ハングル入力処理
+	- `hangul_utils.py`: ハングル関連ユーティリティ
+	- `vocab_progress.py`: 語彙読み込み・進捗保存
+	- `tts_player.py`: 音声再生
+- `data/vocab/`: 単語データ（`.txt`）
+- `data/progress/`: 進捗データ（`.json`）
 
 ## 補足
 
