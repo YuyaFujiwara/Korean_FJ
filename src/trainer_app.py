@@ -17,6 +17,8 @@ class TrainerApp(TrainerUIMixin, TrainerHandlersMixin, TrainerIMEMixin):
         self.prog_path = None
         self.ko_to_ja = {}
         self.ja_to_ko = {}
+        self.grammar = []
+        self.grammar_path = None
 
         self.mode = tk.StringVar(value="MC_JA_TO_KO")
         self.current = None

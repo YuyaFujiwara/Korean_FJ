@@ -45,6 +45,7 @@ class TrainerUIMixin:
         modes = [
             ("4択：日→韓（入力不要）", "MC_JA_TO_KO"),
             ("4択：韓→日（入力不要）", "MC_KO_TO_JA"),
+            ("4択：文法→意味（初級85）", "MC_GRAMMAR_TO_JA"),
             ("ローマ字/ハングル入力：日→韓（IME不要）", "TYPE_ROMA_JA_TO_KO"),
             ("フラッシュ：韓⇄日（見るだけ）", "FLASH"),
         ]

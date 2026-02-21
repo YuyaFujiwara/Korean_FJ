@@ -1,5 +1,6 @@
 import os
 import random
+import csv
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from typing import Any
@@ -16,6 +17,7 @@ from vocab_progress import (
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VOCAB_DIR = os.path.join(PROJECT_ROOT, "data", "vocab")
+GRAMMAR_PATH = os.path.join(PROJECT_ROOT, "data", "grammar", "grammar-85.tsv")
 
 
 class TrainerHandlersMixin:
@@ -37,19 +39,46 @@ class TrainerHandlersMixin:
     _ime_sync_if_needed: Any
     ime_commit: Any
 
+    def _load_grammar(self):
+        self.grammar = []
+        self.grammar_path = GRAMMAR_PATH
+        if not os.path.exists(GRAMMAR_PATH):
+            return
+        try:
+            with open(GRAMMAR_PATH, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f, delimiter="\t")
+                for row in reader:
+                    ko = (row.get("한글") or "").strip()
+                    ja = (row.get("日本語") or "").strip()
+                    connect = (row.get("接続ルール") or "").strip()
+                    if not ko or not ja:
+                        continue
+                    self.grammar.append({"ko": ko, "ja": ja, "connect": connect})
+        except Exception:
+            self.grammar = []
+
     def _load_on_start(self):
-        default = os.path.join(VOCAB_DIR, "syokyuu_hanguk.txt")
-        if os.path.exists(default):
+        self._load_grammar()
+
+        default_candidates = [
+            os.path.join(VOCAB_DIR, "syokyuu_hanguk.tsv"),
+            os.path.join(VOCAB_DIR, "syokyuu_hanguk.txt"),
+        ]
+        default = next((p for p in default_candidates if os.path.exists(p)), None)
+
+        if default:
             self.load_file(default)
             self.next_item()
+        elif self.grammar:
+            self.last_feedback.set("語彙ファイル未読込。文法モードは利用できます。")
         else:
             self.last_feedback.set("ファイルを選んで開始。TSV: 番号<TAB>韓国語<TAB>日本語")
 
     def pick_file(self):
         path = filedialog.askopenfilename(
-            title="syokyuu_hanguk.txt を選択",
+            title="syokyuu_hanguk.tsv を選択",
             initialdir=VOCAB_DIR,
-            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            filetypes=[("TSV files", "*.tsv"), ("Text files", "*.txt"), ("All files", "*.*")],
         )
         if path:
             self.load_file(path)
@@ -77,15 +106,22 @@ class TrainerHandlersMixin:
         label = self.mode_combo.get()
         self.mode.set(self.mode_map[label])
         self._render_mode_ui()
-        if self.vocab:
+        if self.vocab or self.grammar:
             self.next_item()
 
     def next_item(self):
-        if not self.vocab:
-            self.last_feedback.set("まず単語ファイルを読み込んで。")
-            return
+        m = self.mode.get()
+        if m == "MC_GRAMMAR_TO_JA":
+            if not self.grammar:
+                self.last_feedback.set("文法データが見つかりません。data/grammar/grammar-85.tsv を確認してください。")
+                return
+            self.current = random.choice(self.grammar)
+        else:
+            if not self.vocab:
+                self.last_feedback.set("まず単語ファイルを読み込んで。")
+                return
+            self.current = weighted_choice(self.vocab, self.prog)
 
-        self.current = weighted_choice(self.vocab, self.prog)
         self.choices = []
         self.selected_index = None
         self.answered = False
@@ -95,8 +131,6 @@ class TrainerHandlersMixin:
         self.choice_info_var.set("")
         self.flash_answer_var.set("")
 
-        m = self.mode.get()
-
         if m == "MC_JA_TO_KO":
             self.prompt_label.config(text=f"日本語 → 韓国語\n\n{self.current['ja']}")
             self.choices = self._make_choices(correct=self.current["ko"], field="ko")
@@ -105,6 +139,11 @@ class TrainerHandlersMixin:
         elif m == "MC_KO_TO_JA":
             self.prompt_label.config(text=f"韓国語 → 日本語\n\n{self.current['ko']}")
             self.choices = self._make_choices(correct=self.current["ja"], field="ja")
+            self._set_choice_buttons(self.choices)
+            self.confirm_button.config(state="normal")
+        elif m == "MC_GRAMMAR_TO_JA":
+            self.prompt_label.config(text=f"文法 → 日本語\n\n{self.current['ko']}\n\n（意味を選んでください）")
+            self.choices = self._make_choices(correct=self.current["ja"], field="ja", source=self.grammar)
             self._set_choice_buttons(self.choices)
             self.confirm_button.config(state="normal")
         elif m == "TYPE_ROMA_JA_TO_KO":
@@ -119,8 +158,9 @@ class TrainerHandlersMixin:
         else:
             self.prompt_label.config(text="モード不明")
 
-    def _make_choices(self, correct: str, field: str):
-        pool = [v[field] for v in self.vocab if v[field] != correct]
+    def _make_choices(self, correct: str, field: str, source=None):
+        source_data = source if source is not None else self.vocab
+        pool = [v[field] for v in source_data if v[field] != correct]
         wrongs = []
         if pool:
             wrongs = random.sample(pool, k=min(3, len(pool)))
@@ -161,6 +201,8 @@ class TrainerHandlersMixin:
             speak_korean(self.choices[idx])
         elif m == "MC_KO_TO_JA":
             speak_korean(self.current["ko"])
+        elif m == "MC_GRAMMAR_TO_JA":
+            speak_korean(self.current["ko"])
 
     def confirm_choice(self):
         if self.selected_index is None or self.answered or not self.current:
@@ -175,6 +217,12 @@ class TrainerHandlersMixin:
             self.last_feedback.set(self._feedback_text(is_ok, correct_display=correct))
             self._render_choice_result(correct)
         elif m == "MC_KO_TO_JA":
+            correct = self.current["ja"]
+            is_ok = selected == correct
+            self._record_result(is_ok)
+            self.last_feedback.set(self._feedback_text(is_ok, correct_display=correct))
+            self._render_choice_result(correct)
+        elif m == "MC_GRAMMAR_TO_JA":
             correct = self.current["ja"]
             is_ok = selected == correct
             self._record_result(is_ok)
@@ -210,6 +258,10 @@ class TrainerHandlersMixin:
 
     def _record_result(self, is_ok: bool):
         if self.answered:
+            return
+        if self.mode.get() == "MC_GRAMMAR_TO_JA":
+            self.answered = True
+            self._lock_answer_ui()
             return
         self._mark_seen()
 
@@ -292,6 +344,9 @@ class TrainerHandlersMixin:
 
     def play_audio(self):
         if not self.current:
+            return
+        if self.mode.get() == "MC_GRAMMAR_TO_JA":
+            speak_korean(self.current["ko"])
             return
         speak_korean(self.current["ko"])
 
