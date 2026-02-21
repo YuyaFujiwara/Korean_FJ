@@ -21,6 +21,8 @@ class TrainerApp(TrainerUIMixin, TrainerHandlersMixin, TrainerIMEMixin):
         self.grammar_path = None
 
         self.mode = tk.StringVar(value="MC_JA_TO_KO")
+        self.tts_speed_var = tk.DoubleVar(value=0.75)
+        self.tts_speed_label_var = tk.StringVar(value="音声: 0.75x")
         self.current = None
         self.choices = []
         self.selected_index = None

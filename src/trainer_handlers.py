@@ -38,6 +38,25 @@ class TrainerHandlersMixin:
     ime_clear: Any
     _ime_sync_if_needed: Any
     ime_commit: Any
+    tts_speed_var: Any
+    tts_speed_label_var: Any
+
+    def _tts_rate_str(self) -> str:
+        ratio = float(self.tts_speed_var.get())
+        percent = int(round((ratio - 1.0) * 100))
+        return f"{percent:+d}%"
+
+    def on_tts_speed_changed(self, value: str):
+        try:
+            ratio = float(value)
+        except Exception:
+            ratio = float(self.tts_speed_var.get())
+        self.tts_speed_label_var.set(f"音声: {ratio:.2f}x")
+
+    def _speak(self, text: str):
+        if not text:
+            return
+        speak_korean(text, rate=self._tts_rate_str())
 
     def _load_grammar(self):
         self.grammar = []
@@ -51,9 +70,11 @@ class TrainerHandlersMixin:
                     ko = (row.get("한글") or "").strip()
                     ja = (row.get("日本語") or "").strip()
                     connect = (row.get("接続ルール") or "").strip()
+                    ex_ko = (row.get("예문") or "").strip()
+                    ex_ja = (row.get("例文") or "").strip()
                     if not ko or not ja:
                         continue
-                    self.grammar.append({"ko": ko, "ja": ja, "connect": connect})
+                    self.grammar.append({"ko": ko, "ja": ja, "connect": connect, "ex_ko": ex_ko, "ex_ja": ex_ja})
         except Exception:
             self.grammar = []
 
@@ -142,7 +163,9 @@ class TrainerHandlersMixin:
             self._set_choice_buttons(self.choices)
             self.confirm_button.config(state="normal")
         elif m == "MC_GRAMMAR_TO_JA":
-            self.prompt_label.config(text=f"文法 → 日本語\n\n{self.current['ko']}\n\n（意味を選んでください）")
+            example = self.current.get("ex_ko", "")
+            ex_line = f"\n例文: {example}" if example else ""
+            self.prompt_label.config(text=f"文法 → 日本語\n\n{self.current['ko']}{ex_line}\n\n（意味を選んでください）")
             self.choices = self._make_choices(correct=self.current["ja"], field="ja", source=self.grammar)
             self._set_choice_buttons(self.choices)
             self.confirm_button.config(state="normal")
@@ -189,20 +212,20 @@ class TrainerHandlersMixin:
         m = self.mode.get()
         if self.answered:
             if m == "MC_JA_TO_KO" and idx < len(self.choices):
-                speak_korean(self.choices[idx])
+                self._speak(self.choices[idx])
             elif m == "MC_KO_TO_JA":
-                speak_korean(self.current["ko"])
+                self._speak(self.current["ko"])
             return
 
         self.selected_index = idx
         self._render_selected()
 
         if m == "MC_JA_TO_KO":
-            speak_korean(self.choices[idx])
+            self._speak(self.choices[idx])
         elif m == "MC_KO_TO_JA":
-            speak_korean(self.current["ko"])
+            self._speak(self.current["ko"])
         elif m == "MC_GRAMMAR_TO_JA":
-            speak_korean(self.current["ko"])
+            self._speak(self.current["ko"])
 
     def confirm_choice(self):
         if self.selected_index is None or self.answered or not self.current:
@@ -226,7 +249,11 @@ class TrainerHandlersMixin:
             correct = self.current["ja"]
             is_ok = selected == correct
             self._record_result(is_ok)
-            self.last_feedback.set(self._feedback_text(is_ok, correct_display=correct))
+            ex_ja = (self.current.get("ex_ja") or "").strip()
+            base = self._feedback_text(is_ok, correct_display=correct)
+            if ex_ja:
+                base += f"\n例文(日): {ex_ja}"
+            self.last_feedback.set(base)
             self._render_choice_result(correct)
 
     def check_typed(self):
@@ -346,9 +373,18 @@ class TrainerHandlersMixin:
         if not self.current:
             return
         if self.mode.get() == "MC_GRAMMAR_TO_JA":
-            speak_korean(self.current["ko"])
+            self._speak(self.current["ko"])
             return
-        speak_korean(self.current["ko"])
+        self._speak(self.current["ko"])
+
+    def play_example_audio(self):
+        if not self.current:
+            return
+        if self.mode.get() != "MC_GRAMMAR_TO_JA":
+            self.play_audio()
+            return
+        ex_ko = (self.current.get("ex_ko") or "").strip()
+        self._speak(ex_ko if ex_ko else self.current["ko"])
 
     def open_osk(self):
         try:

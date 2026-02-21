@@ -16,7 +16,7 @@ except Exception:
 _tts_lock = threading.Lock()
 
 
-def speak_korean(text: str, voice: str = "ko-KR-SunHiNeural"):
+def speak_korean(text: str, voice: str = "ko-KR-SunHiNeural", rate: str = "-25%"):
     if not EDGE_TTS_AVAILABLE:
         messagebox.showerror("edge-tts 未インストール", "pip install edge-tts を実行してください。")
         return
@@ -35,7 +35,7 @@ def speak_korean(text: str, voice: str = "ko-KR-SunHiNeural"):
             with _tts_lock:
                 mp3_name = f"hanguk_{uuid.uuid4().hex}.mp3"
                 mp3_path = os.path.join(tempfile.gettempdir(), mp3_name)
-                communicate = edge_tts.Communicate(text, voice=voice)  # type: ignore
+                communicate = edge_tts.Communicate(text, voice=voice, rate=rate)  # type: ignore
                 await communicate.save(mp3_path)
                 _play_mp3(mp3_path)
 

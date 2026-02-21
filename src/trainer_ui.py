@@ -11,6 +11,8 @@ class TrainerUIMixin:
     mode_combo: Any
     mode_map: dict[str, str]
     last_feedback: Any
+    tts_speed_var: Any
+    tts_speed_label_var: Any
 
     pick_file: Any
     on_mode_changed: Any
@@ -18,6 +20,8 @@ class TrainerUIMixin:
     show_answer: Any
     show_choices: Any
     play_audio: Any
+    play_example_audio: Any
+    on_tts_speed_changed: Any
     select_choice: Any
     confirm_choice: Any
     check_typed: Any
@@ -55,12 +59,26 @@ class TrainerUIMixin:
         self.mode_combo.bind("<<ComboboxSelected>>", self.on_mode_changed)
         self.mode_combo.pack(side="left", padx=8)
 
+        ttk.Label(mid, textvariable=self.tts_speed_label_var).pack(side="left", padx=(10, 4))
+        self.tts_speed_scale = ttk.Scale(
+            mid,
+            from_=0.5,
+            to=1.25,
+            orient="horizontal",
+            variable=self.tts_speed_var,
+            command=self.on_tts_speed_changed,
+            length=120,
+        )
+        self.tts_speed_scale.pack(side="left", padx=4)
+
         ttk.Button(mid, text="次へ", command=self.next_item).pack(side="left", padx=8)
         self.show_answer_button = ttk.Button(mid, text="答え表示", command=self.show_answer)
         self.show_answer_button.pack(side="left")
         self.show_choices_button = ttk.Button(mid, text="選択肢表示", command=self.show_choices)
         self.show_choices_button.pack(side="left", padx=8)
-        ttk.Button(mid, text="音声再生", command=self.play_audio).pack(side="left", padx=8)
+        self.play_audio_button = ttk.Button(mid, text="音声再生", command=self.play_audio)
+        self.play_audio_button.pack(side="left", padx=8)
+        self.play_example_audio_button = ttk.Button(mid, text="例文音声", command=self.play_example_audio)
 
         self.prompt_frame = ttk.Frame(self.root, padding=10)
         self.prompt_frame.pack(fill="both", expand=True)
@@ -138,13 +156,24 @@ class TrainerUIMixin:
             self.show_answer_button.pack_forget()
             self.show_choices_button.pack_forget()
             self.flash_answer_frame.pack_forget()
+            self.play_audio_button.pack(side="left", padx=8)
+            self.play_example_audio_button.pack_forget()
             self.choice_frame.pack(pady=10)
             self.input_frame.pack_forget()
             self.hangul_frame.pack_forget()
+
+            if m == "MC_GRAMMAR_TO_JA":
+                self.play_audio_button.config(text="文法音声")
+                self.play_example_audio_button.pack(side="left", padx=8)
+            else:
+                self.play_audio_button.config(text="音声再生")
         elif m.startswith("TYPE_"):
             self.show_answer_button.pack(side="left")
             self.show_choices_button.pack(side="left", padx=8)
             self.flash_answer_frame.pack_forget()
+            self.play_audio_button.pack(side="left", padx=8)
+            self.play_audio_button.config(text="音声再生")
+            self.play_example_audio_button.pack_forget()
             self.choice_frame.pack_forget()
             self.input_frame.pack(pady=10)
             self.hangul_frame.pack(pady=6)
@@ -152,6 +181,9 @@ class TrainerUIMixin:
             self.show_answer_button.pack_forget()
             self.show_choices_button.pack_forget()
             self.flash_answer_frame.pack(pady=6)
+            self.play_audio_button.pack(side="left", padx=8)
+            self.play_audio_button.config(text="音声再生")
+            self.play_example_audio_button.pack_forget()
             self.choice_frame.pack_forget()
             self.input_frame.pack_forget()
             self.hangul_frame.pack_forget()
