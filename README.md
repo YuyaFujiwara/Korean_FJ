@@ -19,6 +19,14 @@ pip install -r requirements.txt
 python Hanguk_word.py
 ```
 
+### おまけ: ハングルコピペ用パッド
+
+```bash
+python scripts/hangul_clipboard_pad.py
+```
+
+学習機能とは独立した、ハングル入力してクリップボードへコピーするためのGUIです。
+
 ## 機能
 
 - 4択: 日→韓
