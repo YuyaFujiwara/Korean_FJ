@@ -11,6 +11,10 @@ class TrainerUIMixin:
     mode_combo: Any
     mode_map: dict[str, str]
     last_feedback: Any
+    range_option_var: Any
+    range_start_var: Any
+    range_end_var: Any
+    range_options: Any
     tts_speed_var: Any
     tts_speed_label_var: Any
 
@@ -19,9 +23,12 @@ class TrainerUIMixin:
     next_item: Any
     show_answer: Any
     show_choices: Any
+    show_progress_window: Any
     play_audio: Any
     play_example_audio: Any
     on_tts_speed_changed: Any
+    on_range_option_changed: Any
+    apply_custom_range: Any
     select_choice: Any
     confirm_choice: Any
     check_typed: Any
@@ -59,6 +66,23 @@ class TrainerUIMixin:
         self.mode_combo.bind("<<ComboboxSelected>>", self.on_mode_changed)
         self.mode_combo.pack(side="left", padx=8)
 
+        self.range_combo = ttk.Combobox(
+            mid,
+            state="readonly",
+            values=self.range_options,
+            textvariable=self.range_option_var,
+            width=12,
+        )
+        self.range_combo.bind("<<ComboboxSelected>>", self.on_range_option_changed)
+        self.range_combo.pack(side="left", padx=(10, 4))
+
+        self.range_start_entry = ttk.Entry(mid, textvariable=self.range_start_var, width=5)
+        self.range_start_entry.pack(side="left", padx=(2, 2))
+        ttk.Label(mid, text="-").pack(side="left")
+        self.range_end_entry = ttk.Entry(mid, textvariable=self.range_end_var, width=5)
+        self.range_end_entry.pack(side="left", padx=(2, 4))
+        ttk.Button(mid, text="範囲適用", command=self.apply_custom_range).pack(side="left", padx=(0, 8))
+
         ttk.Label(mid, textvariable=self.tts_speed_label_var).pack(side="left", padx=(10, 4))
         self.tts_speed_scale = ttk.Scale(
             mid,
@@ -72,6 +96,7 @@ class TrainerUIMixin:
         self.tts_speed_scale.pack(side="left", padx=4)
 
         ttk.Button(mid, text="次へ", command=self.next_item).pack(side="left", padx=8)
+        ttk.Button(mid, text="進捗", command=self.show_progress_window).pack(side="left")
         self.show_answer_button = ttk.Button(mid, text="答え表示", command=self.show_answer)
         self.show_answer_button.pack(side="left")
         self.show_choices_button = ttk.Button(mid, text="選択肢表示", command=self.show_choices)

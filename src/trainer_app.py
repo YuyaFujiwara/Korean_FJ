@@ -9,7 +9,8 @@ class TrainerApp(TrainerUIMixin, TrainerHandlersMixin, TrainerIMEMixin):
     def __init__(self, root):
         self.root = root
         self.root.title("Hanguk Trainer (초급)")
-        self.root.geometry("780x520")
+        self.root.geometry("1180x760")
+        self.root.minsize(1080, 700)
 
         self.vocab_path = None
         self.vocab = []
@@ -21,6 +22,11 @@ class TrainerApp(TrainerUIMixin, TrainerHandlersMixin, TrainerIMEMixin):
         self.grammar_path = None
 
         self.mode = tk.StringVar(value="MC_JA_TO_KO")
+        self.range_option_var = tk.StringVar(value="全範囲")
+        self.range_start_var = tk.StringVar(value="")
+        self.range_end_var = tk.StringVar(value="")
+        self.range_options = ["全範囲"]
+        self.active_vocab = []
         self.tts_speed_var = tk.DoubleVar(value=0.75)
         self.tts_speed_label_var = tk.StringVar(value="音声: 0.75x")
         self.current = None

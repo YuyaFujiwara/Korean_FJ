@@ -2,7 +2,7 @@ import os
 import random
 import csv
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from typing import Any
 
 from hangul_utils import hangul_to_rr, norm_answer
@@ -40,6 +40,202 @@ class TrainerHandlersMixin:
     ime_commit: Any
     tts_speed_var: Any
     tts_speed_label_var: Any
+
+    def show_progress_window(self):
+        if not self.vocab:
+            self.last_feedback.set("まず単語ファイルを読み込んで。")
+            return
+
+        target_vocab = self._active_vocab_or_all()
+        target_words = [v["ko"] for v in target_vocab if v.get("ko") in self.prog]
+
+        total = len(target_words)
+        seen_total = sum(self.prog[w]["seen"] for w in target_words)
+        correct_total = sum(self.prog[w]["correct"] for w in target_words)
+        wrong_total = sum(self.prog[w]["wrong"] for w in target_words)
+        learned_count = sum(1 for w in target_words if self.prog[w]["seen"] > 0)
+        acc = (correct_total / max(1, (correct_total + wrong_total))) * 100.0
+        coverage = (learned_count / max(1, total)) * 100.0
+
+        word_by_ko = {v["ko"]: v for v in target_vocab}
+        weak_candidates = []
+        for ko in target_words:
+            p = self.prog[ko]
+            score = p["wrong"] - p["correct"]
+            weak_candidates.append((score, p["wrong"], p["seen"], ko))
+        weak_candidates.sort(reverse=True)
+        weak_top = [w for w in weak_candidates if w[2] > 0][:10]
+
+        win = tk.Toplevel(self.root)
+        win.title("進捗ダッシュボード")
+        win.geometry("980x640")
+
+        head = ttk.Frame(win, padding=10)
+        head.pack(fill="x")
+
+        range_label = self.range_option_var.get() if self.range_option_var.get() else "全範囲"
+        ttk.Label(head, text=f"範囲: {range_label}  ({len(target_vocab)}/{len(self.vocab)}語)", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        ttk.Label(
+            head,
+            text=f"学習済み単語: {learned_count}/{total} ({coverage:.1f}%)   Seen: {seen_total}   Correct: {correct_total}   Wrong: {wrong_total}   Acc: {acc:.1f}%",
+        ).pack(anchor="w", pady=(4, 0))
+
+        coverage_bar = ttk.Progressbar(head, mode="determinate", maximum=100, value=coverage)
+        coverage_bar.pack(fill="x", pady=(8, 0))
+
+        weak_frame = ttk.LabelFrame(win, text="弱点TOP10（wrong-correct）", padding=8)
+        weak_frame.pack(fill="x", padx=10, pady=(6, 0))
+        if weak_top:
+            for _, wrong, seen, ko in weak_top:
+                ja = word_by_ko.get(ko, {}).get("ja", "?")
+                p = self.prog[ko]
+                row_acc = (p["correct"] / max(1, (p["correct"] + p["wrong"]))) * 100.0
+                ttk.Label(
+                    weak_frame,
+                    text=f"{ko} ({ja})  seen:{seen}  wrong:{wrong}  acc:{row_acc:.1f}%",
+                ).pack(anchor="w")
+        else:
+            ttk.Label(weak_frame, text="まだ学習データがありません。まず数問解いてみてください。", foreground="#666666").pack(anchor="w")
+
+        table_wrap = ttk.Frame(win, padding=10)
+        table_wrap.pack(fill="both", expand=True)
+
+        cols = ("id", "ko", "ja", "seen", "correct", "wrong", "acc")
+        tree = ttk.Treeview(table_wrap, columns=cols, show="headings", height=16)
+        tree.heading("id", text="ID")
+        tree.heading("ko", text="韓国語")
+        tree.heading("ja", text="日本語")
+        tree.heading("seen", text="Seen")
+        tree.heading("correct", text="Correct")
+        tree.heading("wrong", text="Wrong")
+        tree.heading("acc", text="Acc%")
+
+        tree.column("id", width=60, anchor="e")
+        tree.column("ko", width=140, anchor="w")
+        tree.column("ja", width=240, anchor="w")
+        tree.column("seen", width=80, anchor="e")
+        tree.column("correct", width=80, anchor="e")
+        tree.column("wrong", width=80, anchor="e")
+        tree.column("acc", width=80, anchor="e")
+
+        rows = []
+        for v in target_vocab:
+            ko = v["ko"]
+            if ko not in self.prog:
+                continue
+            p = self.prog[ko]
+            row_acc = (p["correct"] / max(1, (p["correct"] + p["wrong"]))) * 100.0
+            row_id = v.get("id")
+            row_id_text = "" if row_id is None else str(row_id)
+            rows.append((p["seen"], p["wrong"], row_id_text, ko, v.get("ja", ""), p["seen"], p["correct"], p["wrong"], f"{row_acc:.1f}"))
+
+        rows.sort(key=lambda x: (-x[0], -x[1], x[2]))
+        for _, __, row_id_text, ko, ja, seen, correct, wrong, row_acc in rows:
+            tree.insert("", "end", values=(row_id_text, ko, ja, seen, correct, wrong, row_acc))
+
+        ybar = ttk.Scrollbar(table_wrap, orient="vertical", command=tree.yview)
+        xbar = ttk.Scrollbar(table_wrap, orient="horizontal", command=tree.xview)
+        tree.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
+
+        tree.grid(row=0, column=0, sticky="nsew")
+        ybar.grid(row=0, column=1, sticky="ns")
+        xbar.grid(row=1, column=0, sticky="ew")
+
+        table_wrap.rowconfigure(0, weight=1)
+        table_wrap.columnconfigure(0, weight=1)
+
+    def _active_vocab_or_all(self):
+        if self.active_vocab:
+            return self.active_vocab
+        return self.vocab
+
+    def _build_range_options(self):
+        numeric_ids = sorted({v["id"] for v in self.vocab if isinstance(v.get("id"), int)})
+        options = ["全範囲"]
+        if numeric_ids:
+            max_id = max(numeric_ids)
+            step = 100
+            start = 1
+            while start <= max_id:
+                end = min(start + step - 1, max_id)
+                options.append(f"{start}-{end}")
+                start += step
+
+        self.range_options = options
+        self.range_combo.config(values=options)
+
+        default_label = options[1] if len(options) > 1 else "全範囲"
+        self.range_option_var.set(default_label)
+        self._apply_range_label(default_label)
+
+    def _apply_range_label(self, label: str):
+        label = (label or "").strip()
+        if not label or label == "全範囲":
+            self.active_vocab = list(self.vocab)
+            self.range_start_var.set("")
+            self.range_end_var.set("")
+            self.update_stats()
+            return
+
+        try:
+            start_str, end_str = label.split("-", 1)
+            start = int(start_str)
+            end = int(end_str)
+        except Exception:
+            self.active_vocab = list(self.vocab)
+            self.update_stats()
+            return
+
+        self._apply_range_ids(start, end, update_combo=False)
+
+    def _apply_range_ids(self, start: int, end: int, update_combo: bool = True):
+        if start > end:
+            start, end = end, start
+        self.range_start_var.set(str(start))
+        self.range_end_var.set(str(end))
+
+        filtered = [
+            v for v in self.vocab
+            if isinstance(v.get("id"), int) and start <= v["id"] <= end
+        ]
+
+        if not filtered:
+            self.last_feedback.set("指定範囲に単語がありません。全範囲に戻します。")
+            self.active_vocab = list(self.vocab)
+            if update_combo:
+                self.range_option_var.set("全範囲")
+            self.update_stats()
+            return
+
+        self.active_vocab = filtered
+        label = f"{start}-{end}"
+        if update_combo:
+            self.range_option_var.set(label if label in self.range_options else "カスタム")
+        self.update_stats()
+
+    def on_range_option_changed(self, _evt=None):
+        self._apply_range_label(self.range_option_var.get())
+        if self.vocab and self.mode.get() != "MC_GRAMMAR_TO_JA":
+            self.next_item()
+
+    def apply_custom_range(self):
+        if not self.vocab:
+            self.last_feedback.set("まず単語ファイルを読み込んで。")
+            return
+        s = self.range_start_var.get().strip()
+        e = self.range_end_var.get().strip()
+        if not s or not e:
+            self.last_feedback.set("開始IDと終了IDを入力してください。")
+            return
+        try:
+            start = int(s)
+            end = int(e)
+        except ValueError:
+            self.last_feedback.set("範囲IDは数字で入力してください。")
+            return
+        self._apply_range_ids(start, end)
+        if self.mode.get() != "MC_GRAMMAR_TO_JA":
+            self.next_item()
 
     def _tts_rate_str(self) -> str:
         ratio = float(self.tts_speed_var.get())
@@ -119,8 +315,10 @@ class TrainerHandlersMixin:
             self.ja_to_ko.setdefault(v["ja"], []).append(v["ko"])
         self.prog_path = progress_path_for(path)
         self.prog = load_progress(self.prog_path, self.vocab)
+        self._build_range_options()
         self.file_label.config(text=os.path.basename(path))
-        self.last_feedback.set(f"読み込みOK: {len(self.vocab)}語 / 進捗: {self.prog_path}")
+        active_count = len(self._active_vocab_or_all())
+        self.last_feedback.set(f"読み込みOK: {len(self.vocab)}語（学習範囲: {active_count}語） / 進捗: {self.prog_path}")
         self.update_stats()
 
     def on_mode_changed(self, _evt=None):
@@ -141,7 +339,11 @@ class TrainerHandlersMixin:
             if not self.vocab:
                 self.last_feedback.set("まず単語ファイルを読み込んで。")
                 return
-            self.current = weighted_choice(self.vocab, self.prog)
+            active = self._active_vocab_or_all()
+            if not active:
+                self.last_feedback.set("現在の範囲に単語がありません。範囲を変更してください。")
+                return
+            self.current = weighted_choice(active, self.prog)
 
         self.choices = []
         self.selected_index = None
@@ -182,7 +384,7 @@ class TrainerHandlersMixin:
             self.prompt_label.config(text="モード不明")
 
     def _make_choices(self, correct: str, field: str, source=None):
-        source_data = source if source is not None else self.vocab
+        source_data = source if source is not None else self._active_vocab_or_all()
         pool = [v[field] for v in source_data if v[field] != correct]
         wrongs = []
         if pool:
@@ -407,10 +609,14 @@ class TrainerHandlersMixin:
         if not self.vocab:
             self.stats_label.config(text="")
             return
-        total_seen = sum(v["seen"] for v in self.prog.values())
-        total_correct = sum(v["correct"] for v in self.prog.values())
-        total_wrong = sum(v["wrong"] for v in self.prog.values())
+
+        target_vocab = self._active_vocab_or_all()
+        target_words = [v["ko"] for v in target_vocab]
+        total_seen = sum(self.prog[w]["seen"] for w in target_words if w in self.prog)
+        total_correct = sum(self.prog[w]["correct"] for w in target_words if w in self.prog)
+        total_wrong = sum(self.prog[w]["wrong"] for w in target_words if w in self.prog)
         acc = (total_correct / max(1, (total_correct + total_wrong))) * 100.0
+        range_info = self.range_option_var.get() if self.range_option_var.get() else "全範囲"
         self.stats_label.config(
-            text=f"Seen:{total_seen}  Correct:{total_correct}  Wrong:{total_wrong}  Acc:{acc:.1f}%"
+            text=f"Range:{range_info} ({len(target_vocab)}/{len(self.vocab)})  Seen:{total_seen}  Correct:{total_correct}  Wrong:{total_wrong}  Acc:{acc:.1f}%"
         )
