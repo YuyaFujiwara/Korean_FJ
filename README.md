@@ -16,11 +16,10 @@ pip install -r requirements.txt
 ## 起動
 
 ```bash
-python Hanguk_word.py
+python src/Hanguk_word.py
 ```
 
 ### おまけ: ハングルコピペ用パッド
-
 ```bash
 python scripts/hangul_clipboard_pad.py
 ```
@@ -31,6 +30,7 @@ python scripts/hangul_clipboard_pad.py
 
 - 4択: 日→韓
 - 4択: 韓→日
+- 4択: 韓→日 文法
 - 入力: 日→韓（ローマ字 / ハングル入力パッド）
 - フラッシュ: 韓⇄日
 - 音声再生（`edge-tts`）
