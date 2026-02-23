@@ -1,3 +1,7 @@
 __pycache__/
 *.json
 scripts/create_db.py
+data/vocab/syokyuu_hanguk.tsv
+data/vocab/tyuukyuu_hanguk.tsv
+data/grammar/grammar_beginner.tsv
+data/grammar/grammar_tyuukyuu.tsv
